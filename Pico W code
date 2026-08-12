@@ -26,11 +26,15 @@ __name__ = 'Web_BeeHive_Indoor'
 # Indoor Kookaberry
 #     |
 #     v
-# Wi-Fi Dashboard
+# Local Wi-Fi Dashboard
 #
 # IMPORTANT:
-# The Kookaberry's Wi-Fi does NOT require internet.
-# It creates its own Wi-Fi network.
+# The Kookaberry creates its OWN Wi-Fi network.
+# INTERNET IS NOT REQUIRED.
+#
+# The indoor hub does NOT directly read the sensors.
+# It will eventually extract the sensor values from the
+# data packet received through the HC-12.
 #
 # ============================================================
 
@@ -75,12 +79,11 @@ disp = kooka.display
 
 
 # ============================================================
-# HC-12 RECEIVER
+# FUTURE HC-12 RECEIVER
 # ============================================================
 #
-# FUTURE:
-# The indoor HC-12 will receive the sensor data transmitted
-# by the outdoor HC-12.
+# The HC-12 will receive the data packet sent by the outdoor
+# Pico.
 #
 # The exact UART and pin numbers depend on the final wiring.
 #
@@ -105,29 +108,45 @@ disp = kooka.display
 # SENSOR DATA
 # ============================================================
 #
-# These variables will eventually contain the values received
-# from the outdoor system through the HC-12.
+# IMPORTANT:
 #
-# They are currently set to 0 so the code can run without
-# any sensors or radio connected.
+# These values are NOT being measured by the indoor hub.
+#
+# They will eventually be extracted from the packet received
+# through the HC-12.
+#
+# They are currently set to 0 so the dashboard can run
+# without any hardware connected.
 #
 # ============================================================
 
 
 # ------------------------------------------------------------
-# TEMPERATURE
+# OUTDOOR TEMPERATURE
 # ------------------------------------------------------------
-
-# Outdoor Temperature
+#
 # SENSOR: BME280
-# CHANGE SENSOR IF FINAL WIRING USES A DIFFERENT SENSOR
+#
+# This will eventually come from the OUTDOOR Pico through
+# the HC-12.
+#
+# CHANGE SENSOR IF FINAL WIRING USES A DIFFERENT SENSOR.
+#
+# ------------------------------------------------------------
 
 outdoor_temperature = 0
 
 
-# Beehive Temperature
+# ------------------------------------------------------------
+# BEEHIVE TEMPERATURE
+# ------------------------------------------------------------
+#
 # SENSOR: DHT22
-# CHANGE SENSOR IF FINAL WIRING USES A DIFFERENT SENSOR
+#
+# This is currently a placeholder mapping.
+# Change according to final sensor placement.
+#
+# ------------------------------------------------------------
 
 beehive_temperature = 0
 
@@ -135,10 +154,12 @@ beehive_temperature = 0
 # ------------------------------------------------------------
 # HUMIDITY
 # ------------------------------------------------------------
-
-# Humidity
+#
 # SENSOR: DHT22
-# CHANGE SENSOR IF FINAL WIRING USES A DIFFERENT SENSOR
+#
+# Change according to final sensor placement.
+#
+# ------------------------------------------------------------
 
 humidity = 0
 
@@ -146,9 +167,10 @@ humidity = 0
 # ------------------------------------------------------------
 # AIR PRESSURE
 # ------------------------------------------------------------
-
-# Air Pressure
+#
 # SENSOR: BME280
+#
+# ------------------------------------------------------------
 
 air_pressure = 0
 
@@ -156,9 +178,10 @@ air_pressure = 0
 # ------------------------------------------------------------
 # LIGHT
 # ------------------------------------------------------------
-
-# Light Level
+#
 # SENSOR: VEML7700
+#
+# ------------------------------------------------------------
 
 light_level = 0
 
@@ -166,17 +189,26 @@ light_level = 0
 # ------------------------------------------------------------
 # GPS / LOCATION
 # ------------------------------------------------------------
-
-# Location
+#
 # SENSOR: NEO-6M GPS
+#
+# ------------------------------------------------------------
 
 gps_latitude = 0
 gps_longitude = 0
 gps_altitude = 0
 
 
-# GPS date and time
+# ------------------------------------------------------------
+# GPS DATE AND TIME
+# ------------------------------------------------------------
+#
 # SENSOR: NEO-6M GPS
+#
+# The outdoor system will eventually send the GPS time
+# together with the sensor readings.
+#
+# ------------------------------------------------------------
 
 recorded_date = '--/--/----'
 recorded_time = '--:--:--'
@@ -185,9 +217,10 @@ recorded_time = '--:--:--'
 # ------------------------------------------------------------
 # HIVE SOUND
 # ------------------------------------------------------------
-
-# Hive Sound
-# SENSOR: Microphone
+#
+# SENSOR: MICROPHONE
+#
+# ------------------------------------------------------------
 
 hive_sound = 0
 
@@ -195,16 +228,12 @@ hive_sound = 0
 # ------------------------------------------------------------
 # POWER
 # ------------------------------------------------------------
-
-# Solar Voltage
-# SENSOR: Solar Cell Monitoring Module
+#
+# SENSOR: SOLAR CELL MONITORING MODULE
+#
+# ------------------------------------------------------------
 
 solar_voltage = 0
-
-
-# Solar Current
-# SENSOR: Solar Cell Monitoring Module
-
 solar_current = 0
 
 
@@ -288,7 +317,7 @@ def webpage(
 
 
         <!-- =================================================
-             BEEHIVE PROPERTIES
+             PROPERTIES
              ================================================= -->
 
         <h2>Properties</h2>
@@ -399,7 +428,7 @@ def webpage(
 
 
         <!-- =================================================
-             REFRESH
+             WEBPAGE REFRESH
              =================================================
              
              10000 milliseconds = 10 seconds.
@@ -433,9 +462,9 @@ def webpage(
 # START WI-FI ACCESS POINT
 # ============================================================
 #
-# The Kookaberry creates a Wi-Fi network.
+# Creates a local Wi-Fi network directly from the Kookaberry.
 #
-# Internet is NOT required.
+# INTERNET IS NOT REQUIRED.
 #
 # ============================================================
 
@@ -476,7 +505,7 @@ print(
 # GET IP ADDRESS
 # ============================================================
 #
-# This is the IP address you enter into the browser.
+# This is the IP address you enter into your browser.
 #
 # ============================================================
 
@@ -540,10 +569,7 @@ while True:
     #
     # FUTURE:
     #
-    # The outdoor system will transmit the sensor data through
-    # the HC-12.
-    #
-    # Example data format:
+    # The outdoor Pico will transmit a packet such as:
     #
     # TEMP_OUT=25.4,
     # TEMP_HIVE=34.1,
@@ -559,7 +585,11 @@ while True:
     # DATE=12/08/2026,
     # TIME=15:42:18
     #
-    # CHANGE ACCORDING TO FINAL HC-12 DATA FORMAT
+    # The indoor hub will NOT measure these values.
+    #
+    # It will extract the values from the HC-12 packet.
+    #
+    # CHANGE ACCORDING TO FINAL HC-12 DATA FORMAT.
     #
     # ========================================================
 
@@ -736,16 +766,12 @@ while True:
     #                 )
 
 
-    #         print('Received data:')
-    #         print(data)
-
-
     # ========================================================
     # UPDATE KOOKABERRY DISPLAY
     # ========================================================
     #
-    # Shows the main received measurements and the IP address
-    # on the physical Kookaberry display.
+    # Shows the main measurements and IP address on the
+    # physical Kookaberry display.
     #
     # ========================================================
 
