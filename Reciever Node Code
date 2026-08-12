@@ -27,28 +27,22 @@ __name__ = 'Web_BeeHive_Indoor'
 #     |
 #     v
 # Local Wi-Fi Dashboard
-#
-# IMPORTANT:
-# The Kookaberry creates its OWN Wi-Fi network.
-# INTERNET IS NOT REQUIRED.
-#
-# The indoor hub does NOT directly read the sensors.
-# It will eventually extract the sensor values from the
-# data packet received through the HC-12.
-#
-# ============================================================
 
+# IMPORTANT:
+# The Kookaberry creates its OWN Wi-Fi network, INTERNET IS NOT REQUIRED.
+
+# The indoor hub does NOT directly read the sensors, it will eventually extract the sensor values from the data packet received through the HC-12.
 
 # ============================================================
 # IMPORT NECESSARY MODULES
 # ============================================================
-#
+
 # network -> creates the Kookaberry Wi-Fi network
 # socket  -> creates the webpage server
 # time    -> timing functions
 # kooka   -> Kookaberry hardware/display
 # fonts   -> Kookaberry display fonts
-#
+
 # ============================================================
 
 import network
@@ -58,21 +52,16 @@ import time
 import kooka
 import fonts
 
-
 # ============================================================
 # WI-FI SETTINGS
 # ============================================================
-#
+
 # The Kookaberry creates its own Wi-Fi network.
-#
-# INTERNET IS NOT REQUIRED.
-#
-# Connect your laptop/phone to this network and enter the
-# IP address shown on the Kookaberry into a web browser.
-#
+
+# Connect your laptop/phone to this network and enter the IP address shown on the Kookaberry into a web browser.
 # ============================================================
 
-ssid = 'kookaberry'
+ssid = 'Beehive monitoring system'
 password = '12345678'
 
 disp = kooka.display
@@ -93,8 +82,8 @@ disp = kooka.display
 
 # from machine import Pin, UART
 
-# HC12_TX_PIN = 'CHANGE ACCORDING TO PIN ALLOCATION'
-# HC12_RX_PIN = 'CHANGE ACCORDING TO PIN ALLOCATION'
+# HC12_TX_PIN = 'CHANGE ACCORDING TO PIN ALLOCATION' ex. 4
+# HC12_RX_PIN = 'CHANGE ACCORDING TO PIN ALLOCATION' ex. 5
 
 # hc12 = UART(
 #     1,
@@ -108,18 +97,10 @@ disp = kooka.display
 # SENSOR DATA
 # ============================================================
 #
-# IMPORTANT:
-#
-# These values are NOT being measured by the indoor hub.
-#
-# They will eventually be extracted from the packet received
-# through the HC-12.
-#
-# They are currently set to 0 so the dashboard can run
-# without any hardware connected.
-#
-# ============================================================
+# IMPORTANT
+# These readings are  eventually be extracted from the packet received through the HC-12 (beehive)
 
+#They are currently set to 0 so the dashboard can run without any hardware connected.
 
 # ------------------------------------------------------------
 # OUTDOOR TEMPERATURE
