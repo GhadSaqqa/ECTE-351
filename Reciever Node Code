@@ -48,6 +48,9 @@ __name__ = 'Web_BeeHive_Indoor'
 import network
 import socket
 import time
+
+from machine import Pin, UART, RTC
+
 import kooka
 import fonts
 
@@ -79,17 +82,40 @@ disp = kooka.display
 #
 # ============================================================
 
-# from machine import Pin, UART
+# ============================================================
+# HC-12 UART
+# ============================================================
+#
+# CHANGE THESE PINS TO MATCH THE FINAL KOOKABERRY WIRING.
+#
+# The HC-12 receiver receives sensor values and GPS date/time
+# from the outdoor Pico.
+# ============================================================
 
-# HC12_TX_PIN = 'CHANGE ACCORDING TO PIN ALLOCATION' ex. 4
-# HC12_RX_PIN = 'CHANGE ACCORDING TO PIN ALLOCATION' ex. 5
+HC12_TX_PIN = 4
+HC12_RX_PIN = 5
 
-# hc12 = UART(
-#     1,
-#     baudrate=9600,
-#     tx=Pin(HC12_TX_PIN),
-#     rx=Pin(HC12_RX_PIN)
-# )
+hc12 = UART(
+    1,
+    baudrate=9600,
+    tx=Pin(HC12_TX_PIN),
+    rx=Pin(HC12_RX_PIN)
+)
+
+# ============================================================
+# REAL TIME CLOCK
+# ============================================================
+#
+# The RTC is initially set from the GPS date/time received
+# through the HC-12.
+#
+# After that, the Kookaberry RTC keeps the time running
+# locally, so the dashboard does not stay stuck at the last
+# GPS timestamp received.
+# ============================================================
+
+rtc = RTC()
+rtc_set = False
 
 
 # ============================================================
@@ -101,18 +127,27 @@ disp = kooka.display
 
 #They are currently set to 0 so the dashboard can run without any hardware connected.
 
-# OUTDOOR TEMPERATURE SENSOR: BME280
+# ------------------------------------------------------------
+# OUTDOOR TEMPERATURE
+# ------------------------------------------------------------
 #
-# This will eventually come from the OUTDOOR Pico through the HC-12.
+# SENSOR: BME280
+#
+# This will eventually come from the OUTDOOR Pico through
+# the HC-12.
 #
 # CHANGE SENSOR IF FINAL WIRING USES A DIFFERENT SENSOR.
-
+#
 # ------------------------------------------------------------
 
 outdoor_temperature = 0
 
 
-# BEEHIVE TEMPERATURE SENSOR: DHT22
+# ------------------------------------------------------------
+# BEEHIVE TEMPERATURE
+# ------------------------------------------------------------
+#
+# SENSOR: DHT22
 #
 # This is currently a placeholder mapping.
 # Change according to final sensor placement.
@@ -121,7 +156,12 @@ outdoor_temperature = 0
 
 beehive_temperature = 0
 
-# HUMIDITY SENSOR: DHT22
+
+# ------------------------------------------------------------
+# HUMIDITY
+# ------------------------------------------------------------
+#
+# SENSOR: DHT22
 #
 # Change according to final sensor placement.
 #
@@ -150,6 +190,19 @@ air_pressure = 0
 # ------------------------------------------------------------
 
 light_level = 0
+
+
+# ------------------------------------------------------------
+# WEIGHT
+# ------------------------------------------------------------
+#
+# SENSOR: WEIGHT SENSOR
+#
+# Weight is measured in kilograms.
+#
+# ------------------------------------------------------------
+
+weight = 0
 
 
 # ------------------------------------------------------------
@@ -204,6 +257,249 @@ solar_current = 0
 
 
 # ============================================================
+# UPDATE DATE/TIME FROM RTC
+# ============================================================
+
+def update_recorded_datetime():
+    global recorded_date
+    global recorded_time
+
+    dt = rtc.datetime()
+
+    # MicroPython RTC format:
+    # (year, month, day, weekday, hour, minute, second, subseconds)
+
+    recorded_date = '%02d/%02d/%04d' % (
+        dt[2],
+        dt[1],
+        dt[0]
+    )
+
+    recorded_time = '%02d:%02d:%02d' % (
+        dt[4],
+        dt[5],
+        dt[6]
+    )
+
+
+# ============================================================
+# SET RTC FROM GPS DATE/TIME
+# ============================================================
+
+def set_rtc_from_gps(date_string, time_string):
+    global rtc_set
+
+    try:
+        # Expected:
+        # date_string = DD/MM/YYYY
+        # time_string = HH:MM:SS
+
+        date_parts = date_string.split('/')
+        time_parts = time_string.split(':')
+
+        day = int(date_parts[0])
+        month = int(date_parts[1])
+        year = int(date_parts[2])
+
+        hour = int(time_parts[0])
+        minute = int(time_parts[1])
+        second = int(time_parts[2])
+
+        # weekday is not important for this application.
+        # Use 0 as a placeholder.
+        rtc.datetime((
+            year,
+            month,
+            day,
+            0,
+            hour,
+            minute,
+            second,
+            0
+        ))
+
+        rtc_set = True
+
+        update_recorded_datetime()
+
+        print(
+            'RTC set from GPS:',
+            recorded_date,
+            recorded_time
+        )
+
+    except Exception as e:
+        print('GPS date/time error:', e)
+
+
+# ============================================================
+# HC-12 DATA PROCESSING
+# ============================================================
+
+def process_hc12_data():
+    global outdoor_temperature
+    global beehive_temperature
+    global humidity
+    global air_pressure
+    global light_level
+    global weight
+    global gps_latitude
+    global gps_longitude
+    global gps_altitude
+    global solar_voltage
+    global solar_current
+    global hive_sound
+
+    if hc12.any():
+
+        data = hc12.readline()
+
+        if data:
+
+            try:
+                data = data.decode().strip()
+
+                print('HC-12:', data)
+
+                values = data.split(',')
+
+                gps_date = None
+                gps_time = None
+
+                for value in values:
+
+                    # ------------------------------------------
+                    # OUTDOOR TEMPERATURE
+                    # ------------------------------------------
+
+                    if value.startswith('TEMP_OUT='):
+                        outdoor_temperature = float(
+                            value.replace('TEMP_OUT=', '')
+                        )
+
+                    # ------------------------------------------
+                    # BEEHIVE TEMPERATURE
+                    # ------------------------------------------
+
+                    elif value.startswith('TEMP_HIVE='):
+                        beehive_temperature = float(
+                            value.replace('TEMP_HIVE=', '')
+                        )
+
+                    # ------------------------------------------
+                    # HUMIDITY
+                    # ------------------------------------------
+
+                    elif value.startswith('HUM='):
+                        humidity = float(
+                            value.replace('HUM=', '')
+                        )
+
+                    # ------------------------------------------
+                    # AIR PRESSURE
+                    # ------------------------------------------
+
+                    elif value.startswith('PRESS='):
+                        air_pressure = float(
+                            value.replace('PRESS=', '')
+                        )
+
+                    # ------------------------------------------
+                    # LIGHT
+                    # ------------------------------------------
+
+                    elif value.startswith('LIGHT='):
+                        light_level = float(
+                            value.replace('LIGHT=', '')
+                        )
+
+                    # ------------------------------------------
+                    # WEIGHT
+                    # ------------------------------------------
+
+                    elif value.startswith('WEIGHT='):
+                        weight = float(
+                            value.replace('WEIGHT=', '')
+                        )
+
+                    # ------------------------------------------
+                    # GPS LATITUDE
+                    # ------------------------------------------
+
+                    elif value.startswith('LAT='):
+                        gps_latitude = float(
+                            value.replace('LAT=', '')
+                        )
+
+                    # ------------------------------------------
+                    # GPS LONGITUDE
+                    # ------------------------------------------
+
+                    elif value.startswith('LON='):
+                        gps_longitude = float(
+                            value.replace('LON=', '')
+                        )
+
+                    # ------------------------------------------
+                    # GPS ALTITUDE
+                    # ------------------------------------------
+
+                    elif value.startswith('ALT='):
+                        gps_altitude = float(
+                            value.replace('ALT=', '')
+                        )
+
+                    # ------------------------------------------
+                    # SOLAR VOLTAGE
+                    # ------------------------------------------
+
+                    elif value.startswith('SOLAR_V='):
+                        solar_voltage = float(
+                            value.replace('SOLAR_V=', '')
+                        )
+
+                    # ------------------------------------------
+                    # SOLAR CURRENT
+                    # ------------------------------------------
+
+                    elif value.startswith('SOLAR_I='):
+                        solar_current = float(
+                            value.replace('SOLAR_I=', '')
+                        )
+
+                    # ------------------------------------------
+                    # HIVE SOUND
+                    # ------------------------------------------
+
+                    elif value.startswith('SOUND='):
+                        hive_sound = float(
+                            value.replace('SOUND=', '')
+                        )
+
+                    # ------------------------------------------
+                    # GPS DATE
+                    # ------------------------------------------
+
+                    elif value.startswith('DATE='):
+                        gps_date = value.replace('DATE=', '')
+
+                    # ------------------------------------------
+                    # GPS TIME
+                    # ------------------------------------------
+
+                    elif value.startswith('TIME='):
+                        gps_time = value.replace('TIME=', '')
+
+                # Set the RTC only after both date and time
+                # have been received from the same packet.
+                if gps_date is not None and gps_time is not None:
+                    set_rtc_from_gps(gps_date, gps_time)
+
+            except Exception as e:
+                print('HC-12 data error:', e)
+
+
+# ============================================================
 # WEBPAGE FUNCTION
 # ============================================================
 #
@@ -219,6 +515,7 @@ def webpage(
     humidity,
     air_pressure,
     light_level,
+    weight,
     gps_latitude,
     gps_longitude,
     gps_altitude,
@@ -316,6 +613,12 @@ def webpage(
         <p>
             Light Level:
             {light_level} lux
+        </p>
+
+
+        <p>
+            Weight:
+            {weight} kg
         </p>
 
 
@@ -418,6 +721,7 @@ def webpage(
 
     </body>
 
+
     </html>
     """
 
@@ -512,6 +816,10 @@ s.bind(
 
 s.listen(1)
 
+# Do not allow the web server to block HC-12 processing.
+# The loop will continue if no browser is connected.
+s.settimeout(0.1)
+
 
 print(
     'Listening on',
@@ -533,203 +841,17 @@ while True:
     # HC-12 RECEIVE DATA
     # ========================================================
     #
-    # FUTURE:
-    #
-    # The outdoor Pico will transmit a packet such as:
-    #
-    # TEMP_OUT=25.4,
-    # TEMP_HIVE=34.1,
-    # HUM=61.2,
-    # PRESS=1013.4,
-    # LIGHT=450,
-    # LAT=-34.4068,
-    # LON=150.8821,
-    # ALT=35,
-    # SOLAR_V=5.2,
-    # SOLAR_I=120,
-    # SOUND=45,
-    # DATE=12/08/2026,
-    # TIME=15:42:18
-    #
-    # The indoor hub will NOT measure these values.
-    #
-    # It will extract the values from the HC-12 packet.
-    #
-    # CHANGE ACCORDING TO FINAL HC-12 DATA FORMAT.
-    #
+    # The outdoor Pico sends sensor values and GPS date/time.
+    # The Kookaberry receives and processes the packet here.
     # ========================================================
 
-
-    # if hc12.any():
-
-    #     data = hc12.readline()
-
-    #     if data:
-
-    #         data = data.decode().strip()
-
-    #         values = data.split(',')
+    process_hc12_data()
 
 
-    #         for value in values:
-
-
-    #             # ------------------------------------------
-    #             # OUTDOOR TEMPERATURE
-    #             # SENSOR: BME280
-    #             # ------------------------------------------
-
-    #             if value.startswith('TEMP_OUT='):
-
-    #                 outdoor_temperature = float(
-    #                     value.replace('TEMP_OUT=', '')
-    #                 )
-
-
-    #             # ------------------------------------------
-    #             # BEEHIVE TEMPERATURE
-    #             # SENSOR: DHT22
-    #             # ------------------------------------------
-
-    #             elif value.startswith('TEMP_HIVE='):
-
-    #                 beehive_temperature = float(
-    #                     value.replace('TEMP_HIVE=', '')
-    #                 )
-
-
-    #             # ------------------------------------------
-    #             # HUMIDITY
-    #             # SENSOR: DHT22
-    #             # ------------------------------------------
-
-    #             elif value.startswith('HUM='):
-
-    #                 humidity = float(
-    #                     value.replace('HUM=', '')
-    #                 )
-
-
-    #             # ------------------------------------------
-    #             # AIR PRESSURE
-    #             # SENSOR: BME280
-    #             # ------------------------------------------
-
-    #             elif value.startswith('PRESS='):
-
-    #                 air_pressure = float(
-    #                     value.replace('PRESS=', '')
-    #                 )
-
-
-    #             # ------------------------------------------
-    #             # LIGHT
-    #             # SENSOR: VEML7700
-    #             # ------------------------------------------
-
-    #             elif value.startswith('LIGHT='):
-
-    #                 light_level = float(
-    #                     value.replace('LIGHT=', '')
-    #                 )
-
-
-    #             # ------------------------------------------
-    #             # GPS LATITUDE
-    #             # SENSOR: NEO-6M GPS
-    #             # ------------------------------------------
-
-    #             elif value.startswith('LAT='):
-
-    #                 gps_latitude = float(
-    #                     value.replace('LAT=', '')
-    #                 )
-
-
-    #             # ------------------------------------------
-    #             # GPS LONGITUDE
-    #             # SENSOR: NEO-6M GPS
-    #             # ------------------------------------------
-
-    #             elif value.startswith('LON='):
-
-    #                 gps_longitude = float(
-    #                     value.replace('LON=', '')
-    #                 )
-
-
-    #             # ------------------------------------------
-    #             # GPS ALTITUDE
-    #             # SENSOR: NEO-6M GPS
-    #             # ------------------------------------------
-
-    #             elif value.startswith('ALT='):
-
-    #                 gps_altitude = float(
-    #                     value.replace('ALT=', '')
-    #                 )
-
-
-    #             # ------------------------------------------
-    #             # SOLAR VOLTAGE
-    #             # SENSOR: SOLAR MONITORING MODULE
-    #             # ------------------------------------------
-
-    #             elif value.startswith('SOLAR_V='):
-
-    #                 solar_voltage = float(
-    #                     value.replace('SOLAR_V=', '')
-    #                 )
-
-
-    #             # ------------------------------------------
-    #             # SOLAR CURRENT
-    #             # SENSOR: SOLAR MONITORING MODULE
-    #             # ------------------------------------------
-
-    #             elif value.startswith('SOLAR_I='):
-
-    #                 solar_current = float(
-    #                     value.replace('SOLAR_I=', '')
-    #                 )
-
-
-    #             # ------------------------------------------
-    #             # HIVE SOUND
-    #             # SENSOR: MICROPHONE
-    #             # ------------------------------------------
-
-    #             elif value.startswith('SOUND='):
-
-    #                 hive_sound = float(
-    #                     value.replace('SOUND=', '')
-    #                 )
-
-
-    #             # ------------------------------------------
-    #             # GPS DATE
-    #             # SENSOR: NEO-6M GPS
-    #             # ------------------------------------------
-
-    #             elif value.startswith('DATE='):
-
-    #                 recorded_date = value.replace(
-    #                     'DATE=',
-    #                     ''
-    #                 )
-
-
-    #             # ------------------------------------------
-    #             # GPS TIME
-    #             # SENSOR: NEO-6M GPS
-    #             # ------------------------------------------
-
-    #             elif value.startswith('TIME='):
-
-    #                 recorded_time = value.replace(
-    #                     'TIME=',
-    #                     ''
-    #                 )
+    # If the RTC has already been synchronised by GPS,
+    # keep the displayed time live.
+    if rtc_set:
+        update_recorded_datetime()
 
 
     # ========================================================
@@ -856,6 +978,11 @@ while True:
 
             round(
                 light_level,
+                1
+            ),
+
+            round(
+                weight,
                 1
             ),
 
