@@ -48,7 +48,6 @@ __name__ = 'Web_BeeHive_Indoor'
 import network
 import socket
 import time
-
 import kooka
 import fonts
 
@@ -102,27 +101,18 @@ disp = kooka.display
 
 #They are currently set to 0 so the dashboard can run without any hardware connected.
 
-# ------------------------------------------------------------
-# OUTDOOR TEMPERATURE
-# ------------------------------------------------------------
+# OUTDOOR TEMPERATURE SENSOR: BME280
 #
-# SENSOR: BME280
-#
-# This will eventually come from the OUTDOOR Pico through
-# the HC-12.
+# This will eventually come from the OUTDOOR Pico through the HC-12.
 #
 # CHANGE SENSOR IF FINAL WIRING USES A DIFFERENT SENSOR.
-#
+
 # ------------------------------------------------------------
 
 outdoor_temperature = 0
 
 
-# ------------------------------------------------------------
-# BEEHIVE TEMPERATURE
-# ------------------------------------------------------------
-#
-# SENSOR: DHT22
+# BEEHIVE TEMPERATURE SENSOR: DHT22
 #
 # This is currently a placeholder mapping.
 # Change according to final sensor placement.
@@ -131,12 +121,7 @@ outdoor_temperature = 0
 
 beehive_temperature = 0
 
-
-# ------------------------------------------------------------
-# HUMIDITY
-# ------------------------------------------------------------
-#
-# SENSOR: DHT22
+# HUMIDITY SENSOR: DHT22
 #
 # Change according to final sensor placement.
 #
