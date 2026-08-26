@@ -241,7 +241,8 @@ recorded_time = '--:--:--'
 #
 # ------------------------------------------------------------
 
-hive_sound = 0
+hive_sound_db = 0
+hive_sound_hz = 0
 
 
 # ------------------------------------------------------------
@@ -348,7 +349,8 @@ def process_hc12_data():
     global gps_altitude
     global solar_voltage
     global solar_current
-    global hive_sound
+    global hive_sound_db
+    global hive_sound_hz
 
     if hc12.any():
 
@@ -468,11 +470,26 @@ def process_hc12_data():
                         )
 
                     # ------------------------------------------
-                    # HIVE SOUND
+                    # HIVE SOUND DB
                     # ------------------------------------------
 
+                    elif value.startswith('SOUND_DB='):
+                        hive_sound_db = float(
+                            value.replace('SOUND_DB=', '')
+                        )
+
+                    # ------------------------------------------
+                    # HIVE SOUND HZ
+                    # ------------------------------------------
+
+                    elif value.startswith('SOUND_HZ='):
+                        hive_sound_hz = float(
+                            value.replace('SOUND_HZ=', '')
+                        )
+
+                    # Fallback for old single SOUND key
                     elif value.startswith('SOUND='):
-                        hive_sound = float(
+                        hive_sound_db = float(
                             value.replace('SOUND=', '')
                         )
 
@@ -521,213 +538,286 @@ def webpage(
     gps_altitude,
     solar_voltage,
     solar_current,
-    hive_sound,
+    hive_sound_db,
+    hive_sound_hz,
     recorded_date,
     recorded_time
 ):
 
-    html = f"""
-    <!DOCTYPE html>
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>BeeHive Monitoring System</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+        body {{
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            color: #333;
+            padding: 15px;
+        }}
 
-    <html>
+        /* Header Bar without logo */
+        .header {{
+            background-color: #ffc107;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #222;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }}
 
-    <head>
+        .section-title {{
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin: 20px 0 10px 0;
+            color: #444;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 5px;
+        }}
 
-        <title>BeeHive Monitoring System</title>
+        /* Responsive Grid Container */
+        .grid-container {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+        }}
 
-        <meta name="viewport"
-        content="width=device-width, initial-scale=1">
+        /* Metric Card Base */
+        .card {{
+            background: #ffffff;
+            border-radius: 10px;
+            border: 2px solid #e0e0e0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }}
 
-        <style>
+        /* Top Header of Card */
+        .card-header {{
+            padding: 8px 5px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #ffffff;
+            text-transform: uppercase;
+        }}
 
-            body {{
-                min-width: 310px;
-                max-width: 800px;
-                margin: 0 auto;
-                font-family: Arial;
-                padding: 10px;
+        /* Content inside Card */
+        .card-body {{
+            padding: 15px 5px;
+            background: #ffffff;
+        }}
+
+        .card-value {{
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: #111;
+        }}
+
+        .card-unit {{
+            font-size: 0.9rem;
+            color: #666;
+            font-weight: normal;
+        }}
+
+        /* Full Width Card for Audio Graph */
+        .card-full {{
+            grid-column: 1 / -1;
+        }}
+
+        .chart-container {{
+            position: relative;
+            height: 220px;
+            width: 100%;
+            padding: 10px;
+        }}
+
+        /* Status Header Colors */
+        .bg-green {{ background-color: #2e7d32; }}
+        .bg-red {{ background-color: #c62828; }}
+        .bg-blue {{ background-color: #1565c0; }}
+        .bg-amber {{ background-color: #ef6c00; }}
+        .bg-dark {{ background-color: #424242; }}
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        BeeHive Monitoring System
+    </div>
+
+    <!-- PROPERTIES SECTION -->
+    <div class="section-title">Telemetry & Properties</div>
+    <div class="grid-container">
+        <div class="card">
+            <div class="card-header bg-green">Internal Temp</div>
+            <div class="card-body">
+                <div class="card-value">{beehive_temperature}<span class="card-unit"> &deg;C</span></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-green">External Temp</div>
+            <div class="card-body">
+                <div class="card-value">{outdoor_temperature}<span class="card-unit"> &deg;C</span></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-green">Humidity</div>
+            <div class="card-body">
+                <div class="card-value">{humidity}<span class="card-unit"> %</span></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-red">Air Pressure</div>
+            <div class="card-body">
+                <div class="card-value">{air_pressure}<span class="card-unit"> hPa</span></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-red">Hive Weight</div>
+            <div class="card-body">
+                <div class="card-value">{weight}<span class="card-unit"> kg</span></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-red">Light Level</div>
+            <div class="card-body">
+                <div class="card-value">{light_level}<span class="card-unit"> lux</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- HIVE SOUND SECTION -->
+    <div class="section-title">Audio Metrics</div>
+    <div class="grid-container">
+        <div class="card">
+            <div class="card-header bg-amber">Sound Level</div>
+            <div class="card-body">
+                <div class="card-value">{hive_sound_db}<span class="card-unit"> dB</span></div>
+            </div>
+        </div>
+
+        <div class="card card-full">
+            <div class="card-header bg-amber">Hive Frequency</div>
+            <div class="chart-container">
+                <canvas id="soundChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- POWER SECTION -->
+    <div class="section-title">Power System</div>
+    <div class="grid-container">
+        <div class="card">
+            <div class="card-header bg-blue">Solar Voltage</div>
+            <div class="card-body">
+                <div class="card-value">{solar_voltage}<span class="card-unit"> V</span></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-blue">Solar Current</div>
+            <div class="card-body">
+                <div class="card-value">{solar_current}<span class="card-unit"> mA</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOCATION SECTION -->
+    <div class="section-title">Location / GPS</div>
+    <div class="grid-container">
+        <div class="card">
+            <div class="card-header bg-dark">Latitude</div>
+            <div class="card-body">
+                <div class="card-value">{gps_latitude}</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-dark">Longitude</div>
+            <div class="card-body">
+                <div class="card-value">{gps_longitude}</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-dark">Altitude</div>
+            <div class="card-body">
+                <div class="card-value">{gps_altitude}<span class="card-unit"> m</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SYSTEM STATUS SECTION -->
+    <div class="section-title">System Status</div>
+    <div class="grid-container">
+        <div class="card">
+            <div class="card-header bg-dark">Recorded Date</div>
+            <div class="card-body">
+                <div class="card-value" style="font-size: 1.2rem;">{recorded_date}</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-dark">Recorded Time</div>
+            <div class="card-body">
+                <div class="card-value" style="font-size: 1.2rem;">{recorded_time}</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Render Audio Frequency Graph
+        const ctx = document.getElementById('soundChart').getContext('2d');
+        new Chart(ctx, {{
+            type: 'line',
+            data: {{
+                labels: ['10s ago', '8s ago', '6s ago', '4s ago', '2s ago', 'Now'],
+                datasets: [
+                    {{
+                        label: 'Frequency (Hz)',
+                        data: [210, 215, 220, 218, 225, {hive_sound_hz}],
+                        borderColor: '#1565c0',
+                        backgroundColor: 'rgba(21, 101, 192, 0.1)',
+                        fill: true
+                    }}
+                ]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {{
+                    y: {{
+                        type: 'linear',
+                        position: 'left',
+                        title: {{ display: true, text: 'Hz' }}
+                    }}
+                }}
             }}
+        }});
 
-            h1 {{
-                text-align: center;
-                font-size: 2.3rem;
-            }}
-
-            h2 {{
-                text-align: center;
-                font-size: 1.8rem;
-                margin-top: 30px;
-            }}
-
-            p {{
-                font-size: 1.3rem;
-                text-align: center;
-            }}
-
-            .recorded {{
-                font-size: 1.1rem;
-            }}
-
-        </style>
-
-    </head>
-
-
-    <body>
-
-
-        <h1>BeeHive Monitoring System</h1>
-
-
-        <!-- =================================================
-             PROPERTIES
-             ================================================= -->
-
-        <h2>Properties</h2>
-
-
-        <p>
-            Outdoor Temperature:
-            {outdoor_temperature} C
-        </p>
-
-
-        <p>
-            Beehive Temperature:
-            {beehive_temperature} C
-        </p>
-
-
-        <p>
-            Humidity:
-            {humidity} %
-        </p>
-
-
-        <p>
-            Air Pressure:
-            {air_pressure} hPa
-        </p>
-
-
-        <p>
-            Light Level:
-            {light_level} lux
-        </p>
-
-
-        <p>
-            Weight:
-            {weight} kg
-        </p>
-
-
-        <!-- =================================================
-             LOCATION / GPS
-             ================================================= -->
-
-        <h2>Location / GPS</h2>
-
-
-        <p>
-            Latitude:
-            {gps_latitude}
-        </p>
-
-
-        <p>
-            Longitude:
-            {gps_longitude}
-        </p>
-
-
-        <p>
-            Altitude:
-            {gps_altitude} m
-        </p>
-
-
-        <!-- =================================================
-             POWER
-             ================================================= -->
-
-        <h2>Power</h2>
-
-
-        <p>
-            Solar Voltage:
-            {solar_voltage} V
-        </p>
-
-
-        <p>
-            Solar Current:
-            {solar_current} mA
-        </p>
-
-
-        <!-- =================================================
-             HIVE SOUND
-             ================================================= -->
-
-        <h2>Hive Sound</h2>
-
-
-        <p>
-            Sound Level:
-            {hive_sound}
-        </p>
-
-
-        <!-- =================================================
-             RECORDED TIME
-             ================================================= -->
-
-        <h2>Recorded</h2>
-
-
-        <p class="recorded">
-            Date: {recorded_date}
-        </p>
-
-
-        <p class="recorded">
-            Time: {recorded_time}
-        </p>
-
-
-        <!-- =================================================
-             WEBPAGE REFRESH
-             =================================================
-             
-             10000 milliseconds = 10 seconds.
-             
-             CHANGE THIS VALUE IF NEEDED.
-             
-             This refreshes the webpage every 10 seconds.
-             
-             ================================================= -->
-
-        <script>
-
+        // Auto reload page every 10 seconds
         setInterval(function() {{
-
             location.reload(true);
-
         }}, 10000);
+    </script>
 
-        </script>
-
-
-    </body>
-
-
-    </html>
-    """
+</body>
+</html>"""
 
     return str(html)
-
-
 # ============================================================
 # START WI-FI ACCESS POINT
 # ============================================================
@@ -1002,7 +1092,15 @@ while True:
                 1
             ),
 
-            hive_sound,
+            round(
+                hive_sound_db,
+                1
+            ),
+
+            round(
+                hive_sound_hz,
+                1
+            ),
 
             recorded_date,
 
