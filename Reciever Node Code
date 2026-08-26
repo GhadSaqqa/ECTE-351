@@ -1,3 +1,7 @@
+# add in a graph with filters for user to select what data to show (trend) with time filter (past hour, day, week, month, year)
+
+
+
 __name__ = 'Web_BeeHive_Indoor'
 
 # ============================================================
